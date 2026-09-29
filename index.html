@@ -24,8 +24,8 @@
 
 <script>
 const DEFAULT_SLIDES = [
-  { html: '<div class="head"><span class="mid">Welcome at</span><img class="wm" src="assets/elari-logo.webp" alt="elari"></div>' },
-  { html: '<div class="big">Spend your time<br>wisely.</div><img class="wm foot" src="assets/elari-logo.webp" alt="elari">' },
+  { theme: '2', corner: 'ru', html: '<div class="mid" style="font-size:4.6vw;margin-bottom:-4vw;position:relative">Welcome at</div><img class="wm huge" src="assets/elari-logo.webp" alt="elari">' },
+  { theme: '1', corner: 'lu', html: '<div class="big">Spend your time<br>wisely.</div><img class="wm foot" src="assets/elari-logo.webp" alt="elari">' },
 ];
 
 const SLIDE_MS = 5000;  // duur per slide
@@ -92,7 +92,7 @@ function rebuild() {
   const guests = activeGuests();
   const list = guests.length
     ? guests.map(guestSlide)
-    : DEFAULT_SLIDES.map((s, i) => ({ key: 'd' + i, html: s.html, theme: '1', corner: 'lu' }));
+    : DEFAULT_SLIDES.map((s, i) => ({ key: 'd' + i, html: s.html, theme: s.theme, corner: s.corner }));
   const key = list.map((s) => s.key + s.html).join('|');
   if (key === currentKey) return;
   currentKey = key;

@@ -133,3 +133,5 @@ button.primary:active { transform: scale(0.98); box-shadow: none; }
 .steps a { color: var(--ink); }
 .hint { font-size: 13px; opacity: 0.65; margin-top: 12px; }
 [hidden] { display: none !important; }
+
+.slide .wm.huge { width: 62vw; }
