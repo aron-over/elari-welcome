@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>elari welcome, inplannen</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <img class="wm" src="assets/elari-logo.webp" alt="elari">
+    <a href="./" target="_blank">Open welcome screen ↗</a>
+  </header>
+
+  <div class="card plain" id="connect" hidden>
+    <h2>Eenmalig koppelen met GitHub</h2>
+    <ol class="steps">
+      <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">github.com/settings/personal-access-tokens/new</a>.</li>
+      <li>Naam: <b>elari welcome</b>. Verloopt: <b>1 jaar</b>.</li>
+      <li>Bij "Repository access" kies <b>Only select repositories</b> en kies <b>elari-welcome</b>.</li>
+      <li>Bij "Permissions", "Repository permissions", zet <b>Contents</b> op <b>Read and write</b>.</li>
+      <li>Klik <b>Generate token</b>, kopieer de code en plak hem hieronder.</li>
+    </ol>
+    <form id="tokenForm" style="margin-top:16px">
+      <label class="full">Token
+        <input id="token" type="password" autocomplete="off" placeholder="github_pat_..." required>
+      </label>
+      <div class="full"><button class="primary" type="submit">Koppelen</button></div>
+    </form>
+    <p class="hint">De code blijft alleen in de browser op deze pc bewaard.</p>
+  </div>
+
+  <div class="card" id="planCard" hidden>
+    <h2>Iemand inplannen</h2>
+    <form id="f">
+      <label class="full">Naam
+        <input id="name" required maxlength="60" placeholder="Bijv. Fleur" autofocus>
+      </label>
+      <label class="full">Boodschap
+        <input id="message" maxlength="100" value="Good luck with your interview">
+        <span class="chips" id="chips"></span>
+      </label>
+      <label>Start
+        <input id="start" type="datetime-local" required>
+      </label>
+      <label>Hoe lang tonen
+        <select id="dur">
+          <option value="30">30 minuten</option>
+          <option value="60" selected>1 uur</option>
+          <option value="120">2 uur</option>
+          <option value="240">4 uur</option>
+          <option value="480">Hele dag (8 uur)</option>
+        </select>
+      </label>
+      <label class="full">Kleur
+        <select id="theme">
+          <option value="auto">Automatisch (per naam)</option>
+          <option value="1">Ice met citrus</option>
+          <option value="2">Lilac met citrus</option>
+          <option value="3">Citrus met lilac</option>
+          <option value="4">Citrus met ice</option>
+        </select>
+      </label>
+      <div class="full"><button class="primary" type="submit">Inplannen</button></div>
+    </form>
+  </div>
+
+  <div class="card plain" id="listCard" hidden>
+    <h2>Planning</h2>
+    <div class="list" id="list"></div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const PRESETS = ['Good luck with your interview', 'Great to have you here'];
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const toLocalInput = (d) => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
+const fmt = (iso) => new Date(iso).toLocaleString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+$('chips').innerHTML = PRESETS.map((p) => `<button type="button" class="chip">${p}</button>`).join('');
+$('chips').addEventListener('click', (e) => { if (e.target.classList.contains('chip')) $('message').value = e.target.textContent; });
+$('start').value = toLocalInput(new Date());
+
+const REPO = 'aron-over/elari-welcome';
+const API = `https://api.github.com/repos/${REPO}/contents/schedule.json`;
+const getToken = () => { try { return localStorage.getItem('elari-token'); } catch { return null; } };
+
+const b64 = {
+  enc: (s) => { const b = new TextEncoder().encode(s); let r = ''; b.forEach((x) => (r += String.fromCharCode(x))); return btoa(r); },
+  dec: (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g, '')), (c) => c.charCodeAt(0))),
+};
+const headers = () => ({ Authorization: 'Bearer ' + getToken(), Accept: 'application/vnd.github+json' });
+
+async function readFile() {
+  const r = await fetch(API + '?ref=main&t=' + Date.now(), { headers: headers(), cache: 'no-store' });
+  if (r.status === 401 || r.status === 403) throw new Error('auth');
+  if (!r.ok) throw new Error('Ophalen mislukt (' + r.status + ')');
+  const d = await r.json();
+  return { sha: d.sha, items: JSON.parse(b64.dec(d.content) || '[]') };
+}
+// de wijzigfunctie krijgt de lijst en geeft de nieuwe lijst terug; bij een botsing (409) opnieuw proberen
+async function update(change, message) {
+  for (let n = 0; n < 3; n++) {
+    const { sha, items } = await readFile();
+    const cutoff = Date.now() - 24 * 3600e3;
+    const next = change(items).filter((i) => new Date(i.end).getTime() > cutoff);
+    const r = await fetch(API, {
+      method: 'PUT', headers: headers(),
+      body: JSON.stringify({ message, content: b64.enc(JSON.stringify(next, null, 2) + '\n'), sha, branch: 'main' }),
+    });
+    if (r.ok) return;
+    if (r.status !== 409) throw new Error('Opslaan mislukt (' + r.status + ')');
+  }
+  throw new Error('Opslaan mislukt, probeer opnieuw');
+}
+
+function show() {
+  const on = !!getToken();
+  $('connect').hidden = on; $('planCard').hidden = !on; $('listCard').hidden = !on;
+  if (on) load();
+}
+
+$('tokenForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  try { localStorage.setItem('elari-token', $('token').value.trim()); } catch { return alert('Deze browser laat opslaan niet toe'); }
+  $('token').value = '';
+  show();
+});
+
+$('f').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const start = new Date($('start').value);
+  const end = new Date(start.getTime() + Number($('dur').value) * 6e4);
+  const item = {
+    id: crypto.randomUUID(), name: $('name').value.trim().slice(0, 60), message: $('message').value.trim().slice(0, 100),
+    theme: $('theme').value, start: start.toISOString(), end: end.toISOString(),
+  };
+  if (!item.name) return;
+  const btn = e.submitter; btn.disabled = true; btn.textContent = 'Bezig...';
+  try {
+    await update((items) => [...items, item], 'Inplannen: ' + item.name);
+    $('name').value = ''; $('start').value = toLocalInput(new Date());
+    await load();
+  } catch (err) { fail(err); }
+  btn.disabled = false; btn.textContent = 'Inplannen';
+});
+
+function fail(err) {
+  if (err.message === 'auth') {
+    try { localStorage.removeItem('elari-token'); } catch {}
+    alert('De koppeling met GitHub werkt niet (meer). Plak een nieuwe token.');
+    return show();
+  }
+  alert(err.message);
+}
+
+async function load() {
+  let items;
+  try { ({ items } = await readFile()); } catch (err) { return fail(err); }
+  const now = Date.now();
+  items.sort((a, b) => new Date(a.start) - new Date(b.start));
+  $('list').innerHTML = items.length ? items.map((i) => {
+    const s = new Date(i.start), en = new Date(i.end);
+    const live = s <= now && now < en, past = en <= now;
+    return `<div class="row ${live ? 'live' : ''}" style="${past ? 'opacity:.5' : ''}">
+      <div><div class="who">${esc(i.name)}${live ? '<span class="tag">LIVE</span>' : ''}${past ? '<span class="tag past">voorbij</span>' : ''}</div>
+      <div class="meta">${esc(i.message)} &middot; ${fmt(i.start)} tot ${en.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}</div></div>
+      <button class="del" data-id="${i.id}">verwijderen</button></div>`;
+  }).join('') : '<div class="empty">Niets ingepland. Het welcome screen toont de standaard slides.</div>';
+}
+$('list').addEventListener('click', async (e) => {
+  const id = e.target.dataset.id;
+  if (!id) return;
+  e.target.textContent = 'Bezig...';
+  try { await update((items) => items.filter((i) => i.id !== id), 'Verwijderen'); await load(); } catch (err) { fail(err); }
+});
+show(); setInterval(() => getToken() && load(), 30000);
+</script>
+</body>
+</html>

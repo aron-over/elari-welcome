@@ -6,7 +6,7 @@
 <title>elari welcome</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -24,12 +24,12 @@
 
 <script>
 const DEFAULT_SLIDES = [
-  { html: '<div class="head"><span class="mid">Welcome at</span><img class="wm" src="/assets/elari-logo.webp" alt="elari"></div>' },
-  { html: '<div class="big">Spend your time<br>wisely.</div><img class="wm foot" src="/assets/elari-logo.webp" alt="elari">' },
+  { html: '<div class="head"><span class="mid">Welcome at</span><img class="wm" src="assets/elari-logo.webp" alt="elari"></div>' },
+  { html: '<div class="big">Spend your time<br>wisely.</div><img class="wm foot" src="assets/elari-logo.webp" alt="elari">' },
 ];
 
 const SLIDE_MS = 5000;  // duur per slide
-const POLL_MS = 10000;    // hoe vaak het rooster wordt opgehaald
+const POLL_MS = 90000;    // hoe vaak het rooster wordt opgehaald (GitHub staat ~60 verzoeken per uur toe)
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const stage = document.getElementById('stage');
@@ -56,13 +56,22 @@ let current = [];        // huidige lijst slides
 let currentKey = '';
 let idx = -1;
 
+const REPO = 'aron-over/elari-welcome';
+// ?src=schedule.json leest het lokale bestand (handig om te testen)
+const SRC = new URLSearchParams(location.search).get('src');
+
 async function poll() {
   try {
-    const r = await fetch('/api/schedule', { cache: 'no-store' });
-    const d = await r.json();
-    offset = d.now - Date.now();
-    items = d.items;
-  } catch { /* offline: laatste stand blijft draaien */ }
+    const r = SRC
+      ? await fetch(SRC, { cache: 'no-store' })
+      : await fetch(`https://api.github.com/repos/${REPO}/contents/schedule.json?ref=main`, {
+          cache: 'no-store', headers: { Accept: 'application/vnd.github.raw+json' },
+        });
+    if (!r.ok) throw new Error(r.status);
+    items = await r.json();
+    const serverDate = r.headers.get('Date');           // servertijd, zodat een afwijkende tv-klok niet uitmaakt
+    if (serverDate) offset = new Date(serverDate).getTime() - Date.now();
+  } catch { /* offline of gelimiteerd: laatste stand blijft draaien */ }
   rebuild();
 }
 
@@ -74,7 +83,7 @@ function activeGuests() {
 function guestSlide(g) {
   return {
     key: g.id, ...look(g),
-    html: `<div class="head"><img class="wm" src="/assets/elari-logo.webp" alt="elari"><span class="mid">welcomes</span></div><div class="name">${esc(g.name)}</div>` +
+    html: `<div class="head"><img class="wm" src="assets/elari-logo.webp" alt="elari"><span class="mid">welcomes</span></div><div class="name">${esc(g.name)}</div>` +
           (g.message ? `<div class="mid">${esc(g.message)}</div>` : ''),
   };
 }

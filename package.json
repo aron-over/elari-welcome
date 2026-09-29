@@ -1,7 +1,0 @@
-{
-  "name": "elari-welcome",
-  "version": "1.0.0",
-  "description": "Welcome screen voor de kantoor-tv's + inplan-pagina",
-  "scripts": { "start": "node server.js" },
-  "license": "UNLICENSED"
-}
