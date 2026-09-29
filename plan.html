@@ -15,21 +15,8 @@
   </header>
 
   <div class="card plain" id="connect" hidden>
-    <h2>Eenmalig koppelen met GitHub</h2>
-    <ol class="steps">
-      <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank">github.com/settings/personal-access-tokens/new</a>.</li>
-      <li>Naam: <b>elari welcome</b>. Verloopt: <b>1 jaar</b>.</li>
-      <li>Bij "Repository access" kies <b>Only select repositories</b> en kies <b>elari-welcome</b>.</li>
-      <li>Bij "Permissions", "Repository permissions", zet <b>Contents</b> op <b>Read and write</b>.</li>
-      <li>Klik <b>Generate token</b>, kopieer de code en plak hem hieronder.</li>
-    </ol>
-    <form id="tokenForm" style="margin-top:16px">
-      <label class="full">Token
-        <input id="token" type="password" autocomplete="off" placeholder="github_pat_..." required>
-      </label>
-      <div class="full"><button class="primary" type="submit">Koppelen</button></div>
-    </form>
-    <p class="hint">De code blijft alleen in de browser op deze pc bewaard.</p>
+    <h2>Nog niet gekoppeld</h2>
+    <p>De koppeling met het Google-script ontbreekt nog in <b>config.js</b>. Zie de README voor de stappen.</p>
   </div>
 
   <div class="card" id="planCard" hidden>
@@ -73,6 +60,7 @@
   </div>
 </div>
 
+<script src="config.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const PRESETS = ['Good luck with your interview', 'Great to have you here'];
@@ -85,51 +73,19 @@ $('chips').innerHTML = PRESETS.map((p) => `<button type="button" class="chip">${
 $('chips').addEventListener('click', (e) => { if (e.target.classList.contains('chip')) $('message').value = e.target.textContent; });
 $('start').value = toLocalInput(new Date());
 
-const REPO = 'aron-over/elari-welcome';
-const API = `https://api.github.com/repos/${REPO}/contents/schedule.json`;
-const getToken = () => { try { return localStorage.getItem('elari-token'); } catch { return null; } };
-
-const b64 = {
-  enc: (s) => { const b = new TextEncoder().encode(s); let r = ''; b.forEach((x) => (r += String.fromCharCode(x))); return btoa(r); },
-  dec: (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g, '')), (c) => c.charCodeAt(0))),
-};
-const headers = () => ({ Authorization: 'Bearer ' + getToken(), Accept: 'application/vnd.github+json' });
-
-async function readFile() {
-  const r = await fetch(API + '?ref=main&t=' + Date.now(), { headers: headers(), cache: 'no-store' });
-  if (r.status === 401 || r.status === 403) throw new Error('auth');
-  if (!r.ok) throw new Error('Ophalen mislukt (' + r.status + ')');
+// tekst/plain voorkomt een preflight-verzoek, Google Apps Script kan daar niet mee omgaan
+const post = async (body) => {
+  const r = await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
   const d = await r.json();
-  return { sha: d.sha, items: JSON.parse(b64.dec(d.content) || '[]') };
-}
-// de wijzigfunctie krijgt de lijst en geeft de nieuwe lijst terug; bij een botsing (409) opnieuw proberen
-async function update(change, message) {
-  for (let n = 0; n < 3; n++) {
-    const { sha, items } = await readFile();
-    const cutoff = Date.now() - 24 * 3600e3;
-    const next = change(items).filter((i) => new Date(i.end).getTime() > cutoff);
-    const r = await fetch(API, {
-      method: 'PUT', headers: headers(),
-      body: JSON.stringify({ message, content: b64.enc(JSON.stringify(next, null, 2) + '\n'), sha, branch: 'main' }),
-    });
-    if (r.ok) return;
-    if (r.status !== 409) throw new Error('Opslaan mislukt (' + r.status + ')');
-  }
-  throw new Error('Opslaan mislukt, probeer opnieuw');
-}
+  if (!d.ok) throw new Error(d.error || 'Opslaan mislukt');
+  return d;
+};
 
 function show() {
-  const on = !!getToken();
+  const on = !!SCRIPT_URL;
   $('connect').hidden = on; $('planCard').hidden = !on; $('listCard').hidden = !on;
   if (on) load();
 }
-
-$('tokenForm').addEventListener('submit', (e) => {
-  e.preventDefault();
-  try { localStorage.setItem('elari-token', $('token').value.trim()); } catch { return alert('Deze browser laat opslaan niet toe'); }
-  $('token').value = '';
-  show();
-});
 
 $('f').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -142,26 +98,13 @@ $('f').addEventListener('submit', async (e) => {
   if (!item.name) return;
   const btn = e.submitter; btn.disabled = true; btn.textContent = 'Bezig...';
   try {
-    await update((items) => [...items, item], 'Inplannen: ' + item.name);
+    render(await post({ action: 'add', item }));
     $('name').value = ''; $('start').value = toLocalInput(new Date());
-    await load();
-  } catch (err) { fail(err); }
+  } catch (err) { alert(err.message); }
   btn.disabled = false; btn.textContent = 'Inplannen';
 });
 
-function fail(err) {
-  if (err.message === 'auth') {
-    try { localStorage.removeItem('elari-token'); } catch {}
-    alert('De koppeling met GitHub werkt niet (meer). Plak een nieuwe token.');
-    return show();
-  }
-  alert(err.message);
-}
-
-async function load() {
-  let items;
-  try { ({ items } = await readFile()); } catch (err) { return fail(err); }
-  const now = Date.now();
+function render({ now, items }) {
   items.sort((a, b) => new Date(a.start) - new Date(b.start));
   $('list').innerHTML = items.length ? items.map((i) => {
     const s = new Date(i.start), en = new Date(i.end);
@@ -172,13 +115,18 @@ async function load() {
       <button class="del" data-id="${i.id}">verwijderen</button></div>`;
   }).join('') : '<div class="empty">Niets ingepland. Het welcome screen toont de standaard slides.</div>';
 }
+
+async function load() {
+  try { render(await (await fetch(SCRIPT_URL, { cache: 'no-store' })).json()); }
+  catch { $('list').innerHTML = '<div class="empty">Planning ophalen mislukt. Ververs de pagina.</div>'; }
+}
 $('list').addEventListener('click', async (e) => {
   const id = e.target.dataset.id;
   if (!id) return;
   e.target.textContent = 'Bezig...';
-  try { await update((items) => items.filter((i) => i.id !== id), 'Verwijderen'); await load(); } catch (err) { fail(err); }
+  try { render(await post({ action: 'delete', id })); } catch (err) { alert(err.message); load(); }
 });
-show(); setInterval(() => getToken() && load(), 30000);
+show(); setInterval(() => SCRIPT_URL && load(), 30000);
 </script>
 </body>
 </html>
