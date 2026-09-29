@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>elari welcome</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="grain" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence id="fnoise" type="fractalNoise" baseFrequency="0.25" numOctaves="1" result="n"/>
+    <feDisplacementMap id="fdisp" in="SourceGraphic" in2="n" scale="140"/>
+  </filter>
+</svg>
+
+<div class="stage" id="stage" data-corner="lu" data-theme="1">
+  <div class="blob a"></div>
+  <div class="blob b"></div>
+  <div id="slides"></div>
+</div>
+
+<script>
+const DEFAULT_SLIDES = [
+  { html: '<div class="head"><span class="mid">Welcome at</span><img class="wm" src="/assets/elari-logo.webp" alt="elari"></div>' },
+  { html: '<div class="big">Spend your time<br>wisely.</div><img class="wm foot" src="/assets/elari-logo.webp" alt="elari">' },
+];
+
+const SLIDE_MS = 5000;  // duur per slide
+const POLL_MS = 10000;    // hoe vaak het rooster wordt opgehaald
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const stage = document.getElementById('stage');
+const host = document.getElementById('slides');
+
+// korrelgrootte relatief aan de schermbreedte (afgesteld op 1920px)
+function grain() {
+  const k = innerWidth / 1920;
+  document.getElementById('fnoise').setAttribute('baseFrequency', (0.22 / k).toFixed(3));
+  document.getElementById('fdisp').setAttribute('scale', (150 * k).toFixed(1));
+}
+grain(); addEventListener('resize', grain);
+
+const hash = (s) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+const CORNERS = ['lu', 'ld', 'ru', 'rd'];
+function look(g) {
+  const h = hash(g.name);
+  return { theme: g.theme && g.theme !== 'auto' ? g.theme : String((h % 4) + 1), corner: CORNERS[(h >>> 3) % 4] };
+}
+
+let items = [];
+let offset = 0;          // servertijd - lokale tijd, zodat een afwijkende tv-klok niet uitmaakt
+let current = [];        // huidige lijst slides
+let currentKey = '';
+let idx = -1;
+
+async function poll() {
+  try {
+    const r = await fetch('/api/schedule', { cache: 'no-store' });
+    const d = await r.json();
+    offset = d.now - Date.now();
+    items = d.items;
+  } catch { /* offline: laatste stand blijft draaien */ }
+  rebuild();
+}
+
+function activeGuests() {
+  const now = Date.now() + offset;
+  return items.filter((i) => new Date(i.start) <= now && now < new Date(i.end));
+}
+
+function guestSlide(g) {
+  return {
+    key: g.id, ...look(g),
+    html: `<div class="head"><img class="wm" src="/assets/elari-logo.webp" alt="elari"><span class="mid">welcomes</span></div><div class="name">${esc(g.name)}</div>` +
+          (g.message ? `<div class="mid">${esc(g.message)}</div>` : ''),
+  };
+}
+
+function rebuild() {
+  const guests = activeGuests();
+  const list = guests.length
+    ? guests.map(guestSlide)
+    : DEFAULT_SLIDES.map((s, i) => ({ key: 'd' + i, html: s.html, theme: '1', corner: 'lu' }));
+  const key = list.map((s) => s.key + s.html).join('|');
+  if (key === currentKey) return;
+  currentKey = key;
+  current = list;
+  host.innerHTML = list.map((s) => `<section class="slide">${s.html}</section>`).join('');
+  idx = -1;
+  next();
+}
+
+function applyLook() {
+  const s = current[idx];
+  if (!s) return;
+  stage.dataset.theme = s.theme;
+  stage.dataset.corner = s.corner;
+}
+
+function next() {
+  const els = host.children;
+  if (!els.length) return;
+  for (const e of els) e.classList.remove('on');
+  idx = (idx + 1) % els.length;
+  els[idx].classList.add('on');
+  applyLook();
+}
+
+setInterval(next, SLIDE_MS);
+setInterval(poll, POLL_MS);
+// ook precies op het moment dat een inplanning start/eindigt controleren
+setInterval(rebuild, 1000);
+poll();
+</script>
+</body>
+</html>

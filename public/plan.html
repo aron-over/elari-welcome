@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>elari welcome, inplannen</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <img class="wm" src="/assets/elari-logo.webp" alt="elari">
+    <a href="/" target="_blank">Open welcome screen ↗</a>
+  </header>
+
+  <div class="card">
+    <h2>Iemand inplannen</h2>
+    <form id="f">
+      <label class="full">Naam
+        <input id="name" required maxlength="60" placeholder="Bijv. Fleur" autofocus>
+      </label>
+      <label class="full">Boodschap
+        <input id="message" maxlength="100" value="Good luck with your interview">
+        <span class="chips" id="chips"></span>
+      </label>
+      <label>Start
+        <input id="start" type="datetime-local" required>
+      </label>
+      <label>Hoe lang tonen
+        <select id="dur">
+          <option value="30">30 minuten</option>
+          <option value="60" selected>1 uur</option>
+          <option value="120">2 uur</option>
+          <option value="240">4 uur</option>
+          <option value="480">Hele dag (8 uur)</option>
+        </select>
+      </label>
+      <label class="full">Kleur
+        <select id="theme">
+          <option value="auto">Automatisch (per naam)</option>
+          <option value="1">Ice met citrus</option>
+          <option value="2">Lilac met citrus</option>
+          <option value="3">Citrus met lilac</option>
+          <option value="4">Citrus met ice</option>
+        </select>
+      </label>
+      <div class="full"><button class="primary" type="submit">Inplannen</button></div>
+    </form>
+  </div>
+
+  <div class="card plain">
+    <h2>Planning</h2>
+    <div class="list" id="list"></div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const PRESETS = ['Good luck with your interview', 'Great to have you here'];
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const toLocalInput = (d) => new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
+const fmt = (iso) => new Date(iso).toLocaleString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+$('chips').innerHTML = PRESETS.map((p) => `<button type="button" class="chip">${p}</button>`).join('');
+$('chips').addEventListener('click', (e) => { if (e.target.classList.contains('chip')) $('message').value = e.target.textContent; });
+$('start').value = toLocalInput(new Date());
+
+$('f').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const start = new Date($('start').value);
+  const end = new Date(start.getTime() + Number($('dur').value) * 6e4);
+  const r = await fetch('/api/schedule', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: $('name').value, message: $('message').value, theme: $('theme').value, start: start.toISOString(), end: end.toISOString() }),
+  });
+  if (!r.ok) return alert('Inplannen mislukt');
+  $('name').value = '';
+  $('start').value = toLocalInput(new Date());
+  load();
+});
+
+async function load() {
+  const { now, items } = await (await fetch('/api/schedule', { cache: 'no-store' })).json();
+  items.sort((a, b) => new Date(a.start) - new Date(b.start));
+  $('list').innerHTML = items.length ? items.map((i) => {
+    const s = new Date(i.start), en = new Date(i.end);
+    const live = s <= now && now < en, past = en <= now;
+    return `<div class="row ${live ? 'live' : ''}" style="${past ? 'opacity:.5' : ''}">
+      <div><div class="who">${esc(i.name)}${live ? '<span class="tag">LIVE</span>' : ''}${past ? '<span class="tag past">voorbij</span>' : ''}</div>
+      <div class="meta">${esc(i.message)} &middot; ${fmt(i.start)} tot ${en.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}</div></div>
+      <button class="del" data-id="${i.id}">verwijderen</button></div>`;
+  }).join('') : '<div class="empty">Niets ingepland. Het welcome screen toont de standaard slides.</div>';
+}
+$('list').addEventListener('click', async (e) => {
+  const id = e.target.dataset.id;
+  if (id) { await fetch('/api/schedule/' + id, { method: 'DELETE' }); load(); }
+});
+load(); setInterval(load, 15000);
+</script>
+</body>
+</html>
