@@ -76,9 +76,9 @@ body {
 .slide .big, .slide .name, .slide .mid { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.02em; }
 .slide .big { font-size: 8.5vw; line-height: 1.05; }
 .slide .mid { font-size: 3.6vw; }
-.slide .name { font-size: 12vw; line-height: 1; margin: 2vh 0 3vh; }
+.slide .name { font-size: 15vw; line-height: 1.05; margin: 2vh 0 3vh; max-width: 84vw; text-wrap: balance; }
 .slide .head { display: flex; flex-direction: column; align-items: center; margin-bottom: 1vh; }
-.slide .head .wm { width: 34vw; margin: -5vw 0 -1.5vw; }
+.slide .head .wm { width: 24vw; margin: -3.5vw 0 -1vw; }
 .slide .head .mid { font-size: 4.4vw; position: relative; }
 .slide .foot { position: absolute; bottom: 4vh; width: 20vw; }
 

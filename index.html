@@ -82,7 +82,7 @@ function activeGuests() {
 function guestSlide(g) {
   return {
     key: g.id, ...look(g),
-    html: `<div class="head"><img class="wm" src="assets/elari-logo.webp" alt="elari"><span class="mid">welcomes</span></div><div class="name">${esc(g.name)}</div>` +
+    html: `<div class="head"><img class="wm" src="assets/elari-logo.webp" alt="elari"><span class="mid">welcomes</span></div><div class="name" style="font-size:min(15vw, ${(210 / Math.max(g.name.length, 1)).toFixed(1)}vw)">${esc(g.name)}</div>` +
           (g.message ? `<div class="mid">${esc(g.message)}</div>` : ''),
   };
 }
