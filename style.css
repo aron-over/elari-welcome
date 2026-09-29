@@ -77,9 +77,9 @@ body {
 .slide .big { font-size: 8.5vw; line-height: 1.05; }
 .slide .mid { font-size: 3.6vw; }
 .slide .name { font-size: 12vw; line-height: 1; margin: 2vh 0 3vh; }
-.slide .head { display: flex; align-items: center; gap: 0.5vw; margin-bottom: 1vh; }
-.slide .head .wm { width: 26vw; margin: -4vw 0; }
-.slide .head .mid { padding-top: 1.2vw; font-size: 4.4vw; }
+.slide .head { display: flex; flex-direction: column; align-items: center; margin-bottom: 1vh; }
+.slide .head .wm { width: 34vw; margin: -5vw 0 -1.5vw; }
+.slide .head .mid { font-size: 4.4vw; position: relative; }
 .slide .foot { position: absolute; bottom: 4vh; width: 20vw; }
 
 /* ---------- plan pagina ---------- */
