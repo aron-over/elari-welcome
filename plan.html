@@ -105,16 +105,24 @@ $('f').addEventListener('submit', async (e) => {
   btn.disabled = false; btn.textContent = 'Inplannen';
 });
 
+const row = (i, now) => {
+  const s = new Date(i.start), en = new Date(i.end);
+  const live = s <= now && now < en, past = en <= now;
+  return `<div class="row ${live ? 'live' : ''} ${past ? 'past' : ''}">
+    <div><div class="who">${esc(i.name)}${live ? '<span class="tag">LIVE</span>' : ''}</div>
+    <div class="meta">${esc(i.message)} &middot; ${fmt(i.start)} tot ${en.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}</div></div>
+    <button class="del" data-id="${i.id}">verwijderen</button></div>`;
+};
+
 function render({ now, items }) {
   items.sort((a, b) => new Date(a.start) - new Date(b.start));
-  $('list').innerHTML = items.length ? items.map((i) => {
-    const s = new Date(i.start), en = new Date(i.end);
-    const live = s <= now && now < en, past = en <= now;
-    return `<div class="row ${live ? 'live' : ''}" style="${past ? 'opacity:.5' : ''}">
-      <div><div class="who">${esc(i.name)}${live ? '<span class="tag">LIVE</span>' : ''}${past ? '<span class="tag past">voorbij</span>' : ''}</div>
-      <div class="meta">${esc(i.message)} &middot; ${fmt(i.start)} tot ${en.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}</div></div>
-      <button class="del" data-id="${i.id}">verwijderen</button></div>`;
-  }).join('') : '<div class="empty">Niets ingepland. Het welcome screen toont de standaard slides.</div>';
+  const open = !!document.querySelector('#list details[open]');
+  const past = items.filter((i) => new Date(i.end) <= now).reverse();
+  const upcoming = items.filter((i) => new Date(i.end) > now);
+  $('list').innerHTML = (upcoming.length ? upcoming.map((i) => row(i, now)).join('')
+    : '<div class="empty">Niets ingepland. Het welcome screen toont de standaard slides.</div>')
+    + (past.length ? `<details class="past-group"${open ? ' open' : ''}><summary>Voorbij (${past.length})</summary>
+      <div class="list">${past.map((i) => row(i, now)).join('')}</div></details>` : '');
 }
 
 async function load() {

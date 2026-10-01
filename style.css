@@ -123,7 +123,11 @@ button.primary:active { transform: scale(0.98); box-shadow: none; }
 .row .who { font-weight: 600; font-size: 17px; }
 .row .meta { font-size: 14px; opacity: 0.7; margin-top: 2px; }
 .tag { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 10px; border-radius: 99px; background: var(--ink); color: var(--bone); margin-left: 8px; }
-.tag.past { background: rgba(10, 10, 10, 0.4); }
+.row.past { opacity: 0.5; }
+.past-group { margin-top: 8px; }
+.past-group summary { cursor: pointer; font-weight: 500; opacity: 0.7; padding: 6px 0; }
+.past-group summary:hover { opacity: 1; }
+.past-group[open] summary { margin-bottom: 10px; }
 .del { font: inherit; font-size: 14px; border: none; background: none; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; color: var(--ink); }
 .del:hover { text-decoration-color: #b8b000; }
 .empty { opacity: 0.6; }
