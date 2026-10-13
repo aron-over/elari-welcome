@@ -24,6 +24,25 @@
 
 <script src="config.js"></script>
 <script>
+// Muiscursor automatisch verbergen na 3 seconden zonder beweging (voor tv's).
+(function () {
+  const IDLE_MS = 3000;
+  const style = document.createElement('style');
+  style.textContent = 'html.idle-cursor, html.idle-cursor * { cursor: none !important; }';
+  document.head.appendChild(style);
+  const root = document.documentElement;
+  let timer;
+  function wake() {
+    root.classList.remove('idle-cursor');
+    clearTimeout(timer);
+    timer = setTimeout(() => root.classList.add('idle-cursor'), IDLE_MS);
+  }
+  ['mousemove', 'mousedown', 'touchstart', 'keydown'].forEach(e =>
+    document.addEventListener(e, wake, { passive: true }));
+  wake();
+})();
+</script>
+<script>
 const DEFAULT_SLIDES = [
   { theme: '2', corner: 'ru', html: '<div class="mid" style="font-size:4.6vw;margin-bottom:-4vw;position:relative">Welcome at</div><img class="wm huge" src="assets/elari-logo.webp" alt="elari">' },
   { theme: '1', corner: 'lu', html: '<div class="big">Spend your time<br>wisely.</div><img class="wm foot" src="assets/elari-logo.webp" alt="elari">' },
